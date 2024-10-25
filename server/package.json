@@ -10,6 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "aplay": "^1.2.0",
+    "dnssd2": "^1.0.0",
     "eventemitter3": "^5.0.1",
     "express": "^4.21.1",
     "underscore": "^1.13.7"
