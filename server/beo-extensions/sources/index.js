@@ -16,13 +16,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.*/
 
 // BEOCREATE SOURCES
-var fetch = require("node-fetch");
 var exec = require("child_process").exec;
 
 var debug = beo.debug;
 
 var version = require("./package.json").version;
-
 
 var allSources = {};
 var currentSource = null;
@@ -192,66 +190,113 @@ beo.bus.on("sources", function(event) {
 
 // HIFIBERRY AUDIOCONTROL INTEGRATION
 
+const https = require('https');
 
 function audioControlGet(dataType, callback) {
-	switch (dataType) {
-		case "metadata":
-			endpoint = "/api/track/metadata";
-			processor = processAudioControlMetadata;
-			break;
-		case "status":
-			endpoint = "/api/player/status";
-			processor = processAudioControlStatus;
-			break;
-	}
-	if (endpoint && processor) {
-		fetch("http://127.0.1.1:"+settings.port+endpoint).then(res => {
-			if (res.status == 200) {
-				res.json().then(json => {
-					processor(json);
-					if (callback) callback(true);
-				});
-			} else {
-				// No content.
-				if (debug) console.log("Error retrieving data from AudioControl:", res.status, res.statusText, res.text);
-				if (callback) callback(false);
-			}
-		});
-	}
-}
+    let endpoint, processor;
+    switch (dataType) {
+        case "metadata":
+            endpoint = "/api/track/metadata";
+            processor = processAudioControlMetadata;
+            break;
+        case "status":
+            endpoint = "/api/player/status";
+            processor = processAudioControlStatus;
+            break;
+    }
+    if (endpoint && processor) {
+        const options = {
+            hostname: '127.0.1.1',
+            port: settings.port,
+            path: endpoint,
+            method: 'GET',
+        };
 
+        const req = https.request(options, (res) => {
+            let data = '';
+
+            res.on('data', (chunk) => {
+                data += chunk;
+            });
+
+            res.on('end', () => {
+                if (res.statusCode === 200) {
+                    try {
+                        const json = JSON.parse(data);
+                        processor(json);
+                        if (callback) callback(true);
+                    } catch (error) {
+                        console.error("Error parsing JSON response:", error);
+                        if (callback) callback(false);
+                    }
+                } else {
+                    console.error("Error retrieving data from AudioControl:", res.statusCode, res.statusMessage);
+                    if (callback) callback(false);
+                }
+            });
+        });
+
+        req.on('error', (error) => {
+            console.error("Request error:", error);
+            if (callback) callback(false);
+        });
+
+        req.end();
+    }
+}
 
 function audioControl(operation, extra, callback) {
-	switch (operation) {
-		case "playPause":
-		case "play":
-		case "pause":
-		case "stop":
-		case "next":
-		case "previous":
-			endpoint = "/api/player/"+operation.toLowerCase();
-			break;
-		case "start":
-			endpoint = "/api/player/activate/"+extra;
-			break;
-		case "love":
-		case "unlove":
-			endpoint = "/api/track/"+operation.toLowerCase();
-			break;
-	}
-	if (endpoint) {
-		fetch("http://127.0.1.1:"+settings.port+endpoint, {method: "post"}).then(res => {
-			if (res.status == 200) {
-				if (callback) callback(true);
-			} else {
-				if (debug) console.log("Could not send HiFiBerry control command: " + res.status, res.statusText);
-				if (callback) callback(false, res.statusText);
-			}
-		});
-	}
+    let endpoint;
+    switch (operation) {
+        case "playPause":
+        case "play":
+        case "pause":
+        case "stop":
+        case "next":
+        case "previous":
+            endpoint = `/api/player/${operation.toLowerCase()}`;
+            break;
+        case "start":
+            endpoint = `/api/player/activate/${extra}`;
+            break;
+        case "love":
+        case "unlove":
+            endpoint = `/api/track/${operation.toLowerCase()}`;
+            break;
+    }
+    if (endpoint) {
+        const options = {
+            hostname: '127.0.1.1',
+            port: settings.port,
+            path: endpoint,
+            method: 'POST',
+        };
+
+        const req = https.request(options, (res) => {
+            let data = '';
+
+            res.on('data', (chunk) => {
+                data += chunk;
+            });
+
+            res.on('end', () => {
+                if (res.statusCode === 200) {
+                    if (callback) callback(true);
+                } else {
+                    console.error("Could not send HiFiBerry control command:", res.statusCode, res.statusMessage);
+                    if (callback) callback(false, res.statusMessage);
+                }
+            });
+        });
+
+        req.on('error', (error) => {
+            console.error("Request error:", error);
+            if (callback) callback(false, error);
+        });
+
+        req.end();
+    }
 }
-
-
 
 audioControlLastUpdated = null;
 sourceCheckTimeout = null;

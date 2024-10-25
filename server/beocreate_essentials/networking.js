@@ -528,7 +528,16 @@ function configureIPAddress(options, forInterface, callback) {
 // CONFIGURATION R/W
 // Enables the script to manipulate wpa_supplicant configuration as a JavaScript object.
 function readWifiConfiguration() {
-	modified = fs.statSync(wifiConfigPath).mtimeMs;
+	if (wifiConfigPath && typeof wifiConfigPath === 'string') {
+		const wifiConfig = fs.statSync(wifiConfigPath);
+	} else {
+		console.error('Invalid wifi configuration path: ', wifiConfigPath);
+		return; // 
+	}
+
+	modified = wiFiConfig.mtimeMs;
+
+
 	if (modified != wifiConfigModified) { // Check if the config file has been modified since it was last accessed. Only read and parse if that's the case.
 		wifiConfigModified = modified;
 		wifiConfiguration = {networks: []};

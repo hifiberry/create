@@ -20,77 +20,80 @@ SOFTWARE.*/
 var exec = require("child_process").exec;
 var fs = require("fs");
 
-	var debug = beo.debug;
-	var version = require("./package.json").version;
-	
-	
-	var settings = {
-		loggedInAs: false
-	};
-	var audioControl = null;
-	
-	beo.bus.on('general', function(event) {
-		
-		if (event.header == "startup") {
-			
-			if (beo.extensions["hifiberry-audiocontrol"]) audioControl = beo.extensions["hifiberry-audiocontrol"];
-			
-			if (audioControl) {
-				configuration = audioControl.getSettings();
-				if (configuration.lastfm.username && !configuration.lastfm.username.comment && configuration.lastfm.password && !configuration.lastfm.password.comment) {
-					settings.loggedInAs = configuration.lastfm.username.value;
-				} else {
-					settings.loggedInAs = false;
-				}
-			} 
-		}
-		
-		if (event.header == "activatedExtension") {
-			if (event.content.extension == "last-fm") {
-				beo.bus.emit("ui", {target: "last-fm", header: "lastFMSettings", content: settings});
-			}
-		}
-	});
+var debug = beo.debug;
+var version = require("./package.json").version;
 
-	
-	beo.bus.on('last-fm', function(event) {
-		
+var settings = {
+	loggedInAs: false
+};
+var audioControl = null;
 
-		if (event.header == "logIn" && audioControl) {
-			if (event.content.username && event.content.password) {
-				audioControl.configure([
-					{section: "lastfm", option: "username", value: event.content.username},
-					{section: "lastfm", option: "password", value: event.content.password}
-				], true, function(success, error) {
-					if (success) {
-						settings.loggedInAs = event.content.username;
-						beo.bus.emit("ui", {target: "last-fm", header: "lastFMSettings", content: settings});
-					} else {
-						beo.bus.emit("ui", {target: "last-fm", header: "logInError"});
-						audioControl.configure([
-							{section: "lastfm", option: "username", remove: true},
-							{section: "lastfm", option: "password", remove: true}
-						], true);
-						settings.loggedInAs = false;
-						beo.bus.emit("ui", {target: "last-fm", header: "lastFMSettings", content: settings});
-					}
-				});
+beo.bus.on('general', function (event) {
+
+	if (event.header == "startup") {
+
+		if (beo.extensions["hifiberry-audiocontrol"]) audioControl = beo.extensions["hifiberry-audiocontrol"];
+
+		if (audioControl) {
+			configuration = audioControl.getSettings();
+
+			if (configuration && configuration.lastfm &&
+				configuration.lastfm.username && !configuration.lastfm.username.comment &&
+				configuration.lastfm.password && !configuration.lastfm.password.comment) {
+				settings.loggedInAs = configuration.lastfm.username.value;
+			} else {
+				settings.loggedInAs = false;
 			}
+
 		}
-		
-		if (event.header == "logOut" && audioControl) {
-			settings.loggedInAs = false;
+	}
+
+	if (event.header == "activatedExtension") {
+		if (event.content.extension == "last-fm") {
+			beo.bus.emit("ui", { target: "last-fm", header: "lastFMSettings", content: settings });
+		}
+	}
+});
+
+
+beo.bus.on('last-fm', function (event) {
+
+
+	if (event.header == "logIn" && audioControl) {
+		if (event.content.username && event.content.password) {
 			audioControl.configure([
-				{section: "lastfm", option: "username", remove: true},
-				{section: "lastfm", option: "password", remove: true}
-			], true, function() {
-				beo.bus.emit("ui", {target: "last-fm", header: "lastFMSettings", content: settings});
+				{ section: "lastfm", option: "username", value: event.content.username },
+				{ section: "lastfm", option: "password", value: event.content.password }
+			], true, function (success, error) {
+				if (success) {
+					settings.loggedInAs = event.content.username;
+					beo.bus.emit("ui", { target: "last-fm", header: "lastFMSettings", content: settings });
+				} else {
+					beo.bus.emit("ui", { target: "last-fm", header: "logInError" });
+					audioControl.configure([
+						{ section: "lastfm", option: "username", remove: true },
+						{ section: "lastfm", option: "password", remove: true }
+					], true);
+					settings.loggedInAs = false;
+					beo.bus.emit("ui", { target: "last-fm", header: "lastFMSettings", content: settings });
+				}
 			});
 		}
-	});
-	
-	
-	
+	}
+
+	if (event.header == "logOut" && audioControl) {
+		settings.loggedInAs = false;
+		audioControl.configure([
+			{ section: "lastfm", option: "username", remove: true },
+			{ section: "lastfm", option: "password", remove: true }
+		], true, function () {
+			beo.bus.emit("ui", { target: "last-fm", header: "lastFMSettings", content: settings });
+		});
+	}
+});
+
+
+
 module.exports = {
 	version: version
 };

@@ -22,7 +22,6 @@ var exec = require('child_process').exec;
 
 var net = require("net");
 var dnssd = require("dnssd2"); // for service discovery.
-var fetch = require("node-fetch"); // for sending HTTP requests to the DACP server
 
 	var debug = beo.debug;
 	
@@ -409,37 +408,58 @@ var fetch = require("node-fetch"); // for sending HTTP requests to the DACP serv
 		}
 	}
 	
-	
+	const https = require('https');
+
 	// Send remote control command to DACP server
 	function sendDACPCommand(command, daid) {
-		// A target can be specified for the command. Otherwise it will be directed at the active source.
+		// A target can be specified for the command. Otherwise, it will be directed at the active source.
 		if (!daid) daid = activeRemote.daid;
-		
-		
-		if (controllableSources["shairport-sync-"+daid]) {
-			destination = controllableSources["shairport-sync-"+daid];
-			
+	
+		if (controllableSources["shairport-sync-" + daid]) {
+			const destination = controllableSources["shairport-sync-" + daid];
+	
 			if (destination.daid && destination.acre && dacpServices[destination.daid]) {
-				fetch('http://' + dacpServices[destination.daid].addresses[0] + ":" + dacpServices[destination.daid].port + "/ctrl-int/1/" + command, {
-						headers: {
-							'Active-Remote': destination.acre,
-							'Host': 'starlight.local.'
-						},
-					}).then(res => {
-					if (res.status == 200 || res.status == 204) {
-						// OK.
-					} else {
-						// No content.
-						if (debug) console.log("Error sending DACP command:", res.status, res.statusText, res.text);
+				const options = {
+					hostname: dacpServices[destination.daid].addresses[0],
+					port: dacpServices[destination.daid].port,
+					path: `/ctrl-int/1/${command}`,
+					method: 'GET',
+					headers: {
+						'Active-Remote': destination.acre,
+						'Host': 'starlight.local.'
 					}
+				};
+	
+				const req = https.request(options, (res) => {
+					let data = '';
+	
+					res.on('data', (chunk) => {
+						data += chunk;
+					});
+	
+					res.on('end', () => {
+						if (res.statusCode === 200 || res.statusCode === 204) {
+							// OK
+						} else {
+							if (debug) {
+								console.log("Error sending DACP command:", res.statusCode, res.statusMessage);
+							}
+						}
+					});
 				});
+	
+				req.on('error', (error) => {
+					console.error("Request error:", error);
+				});
+	
+				req.end();
 			}
 		} else {
-			//console.log("No controllable source found.");
+			if (debug) console.log("No controllable source found.");
 		}
 	}
 
-	
+
 	function combineDACPInformation(type) {
 		
 		switch (type) {

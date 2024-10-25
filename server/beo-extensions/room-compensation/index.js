@@ -20,9 +20,7 @@ const spawn = require("child_process").spawn;
 const exec = require("child_process").exec;
 const fs = require("fs");
 const path = require("path");
-const fetch = require("node-fetch");
 var beoDSP = require('../../beocreate_essentials/dsp');
-
 var version = require("./package.json").version;
 var arcDirectory = beo.dataDirectory+"/beo-room-compensation"; // Sound presets directory.
 
@@ -620,52 +618,73 @@ function getCapabilities() {
 	if (beo.extensions.equaliser &&
 		beo.extensions.equaliser.canDoRoomCompensation) {
 		// Check if enough filters are available.
-		if (beo.extensions.equaliser.canDoRoomCompensation(settings.filterCount)) capabilities = 2;
+		if (beo.exte1nsions.equaliser.canDoRoomCompensation(settings.filterCount)) capabilities = 2;
 	}
 }
 
+const https = require('https');
 
 function roomEQAPIRequest(endpoint, data, callback) {
-	if (!roomEQURL) getRoomEQConfig();
-	headers = {'Content-Type': "application/json"};
-	type = "post";
-	switch (endpoint) {
-		case "optimise":
-		case "optimize":
-			endpoint = "optimize";
-			headers["X-UUID"] = xUUID;
-			break;
-		case "curves":
-			type = "get";
-			break;
-	}
-	if (type == "post") {
-		fetch(roomEQURL+"/"+endpoint, {
-			method: "post",
-			headers: headers,
-			body: JSON.stringify(data)}).then(res => {
-			if (res.status == 200) {
-				res.json().then(json => {
-					if (callback) callback(json);
-				});
-			} else {
-				console.error("Could not send or receive data from HiFiBerry room equaliser API: " + res.status, res.statusText);
-				if (callback) callback(null, res.statusText);
-			}
-		});
-	} else if (type == "get") {
-		fetch(roomEQURL+"/"+endpoint).then(res => {
-			if (res.status == 200) {
-				res.json().then(json => {
-					if (callback) callback(json);
-				});
-			} else {
-				console.error("Could not get data from HiFiBerry room equaliser API: " + res.status, res.statusText);
-				if (callback) callback(null, res.statusText);
-			}
-		});
-	}
+    if (!roomEQURL) getRoomEQConfig();
+    let headers = {'Content-Type': "application/json"};
+    let method = "POST";
+    let options = {
+        method: method,
+        headers: headers
+    };
+
+    switch (endpoint) {
+        case "optimise":
+        case "optimize":
+            endpoint = "optimize";
+            headers["X-UUID"] = xUUID;
+            break;
+        case "curves":
+            method = "GET";
+            options.method = method;
+            break;
+    }
+
+    const url = new URL(`${roomEQURL}/${endpoint}`);
+    options.hostname = url.hostname;
+    options.port = url.port || 443;
+    options.path = url.pathname + url.search;
+
+    const req = https.request(options, (res) => {
+        let data = '';
+
+        res.on('data', (chunk) => {
+            data += chunk;
+        });
+
+        res.on('end', () => {
+            if (res.statusCode === 200) {
+                try {
+                    const json = JSON.parse(data);
+                    if (callback) callback(json);
+                } catch (error) {
+                    console.error("Error parsing JSON response:", error);
+                    if (callback) callback(null, error);
+                }
+            } else {
+                console.error(`Could not send or receive data from HiFiBerry room equaliser API: ${res.statusCode} ${res.statusMessage}`);
+                if (callback) callback(null, res.statusMessage);
+            }
+        });
+    });
+
+    req.on('error', (error) => {
+        console.error("Request error:", error);
+        if (callback) callback(null, error);
+    });
+
+    if (method === "POST" && data) {
+        req.write(JSON.stringify(data));
+    }
+
+    req.end();
 }
+
 
 function getRoomEQConfig() {
 	configuration = {};

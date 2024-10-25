@@ -17,7 +17,12 @@ SOFTWARE.*/
 
 // HIFIBERRY DEBUG INFORMATION COLLECTOR FOR BEOCREATE
 
-const fetch = require("node-fetch");
+// const fetch = require("node-fetch");
+(async () => {
+    const fetch = (await import('node-fetch')).default;
+    // The rest of your code here
+})();
+
 var exec = require("child_process").exec;
 var fs = require("fs");
 
