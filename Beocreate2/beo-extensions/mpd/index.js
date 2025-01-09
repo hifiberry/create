@@ -1353,7 +1353,8 @@ async function getNASShares(details) {
 			} else {
 				address = details.server.addresses[0];
 			}
-			sharesRaw = await execPromise("smbclient -N -L "+address+" --user="+details.username+"%"+details.password+" -g | grep 'Disk|'");
+			const escapedPassword = details.password.replaceAll("'", "'\\''");
+			sharesRaw = await execPromise("smbclient -N -L "+address+" --user="+details.username+" --password='"+escapedPassword+"' -g | grep 'Disk|'");
 			sharesRaw = sharesRaw.stdout.trim().split("\n");
 			for (s in sharesRaw) {
 				shareList.push(sharesRaw[s].split("|")[1]);
